@@ -1,0 +1,27 @@
+name: setlio_widgets
+description: >-
+  Geteilte Flutter-Widgets für Setlio und Setronome: Tempo-/Takt-Regler,
+  Tap-Tempo, Akzent-Schläge, Tag-Chips – die Bausteine des Song-Editors.
+version: 0.1.0
+publish_to: none
+
+# Flutter-Paket, aber bewusst OHNE Riverpod/Supabase: Setronome (Riverpod 2)
+# und Setlio (Riverpod 3) binden dieses Paket ein, ohne dass es einer App
+# ein State-Management-Upgrade aufzwingt. Styling ausschließlich über
+# Theme.of(context).colorScheme + DesignTokens-Radien aus setlio_shared,
+# keine Abhängigkeit von app-eigenen Theme-Extensions.
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_fonts: ^8.2.0
+  setlio_shared:
+    path: ../setlio_shared
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
