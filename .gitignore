@@ -4,3 +4,4 @@ pubspec.lock
 build/
 coverage/
 .flutter-plugins-dependencies
+pubspec_overrides.yaml
