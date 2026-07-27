@@ -128,4 +128,70 @@ void main() {
     expect(find.text('Löschen'), findsNothing);
     expect(deleted, isEmpty);
   });
+
+  group('zweite Aktion nach rechts', () {
+    Widget hostBoth({
+      required VoidCallback onDelete,
+      required VoidCallback onLeading,
+    }) =>
+        MaterialApp(
+          home: Scaffold(
+            body: SwipeRevealDelete(
+              itemKey: 'a',
+              enabled: true,
+              onDelete: onDelete,
+              leadingLabel: 'In Ordner',
+              leadingIcon: Icons.folder_outlined,
+              onLeading: onLeading,
+              child: const SizedBox(
+                height: 60,
+                child: Center(child: Text('Song A')),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('nach rechts legt sie frei, Tippen löst aus', (tester) async {
+      var deleted = 0;
+      var moved = 0;
+      await tester.pumpWidget(
+        hostBoth(onDelete: () => deleted++, onLeading: () => moved++),
+      );
+
+      await tester.drag(find.text('Song A'), const Offset(120, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('In Ordner'), findsOneWidget);
+      expect(find.text('Löschen'), findsNothing);
+      expect(moved, 0, reason: 'auch hier löst erst der Tipp aus');
+
+      await tester.tap(find.text('In Ordner'));
+      await tester.pumpAndSettle();
+      expect(moved, 1);
+      expect(deleted, 0);
+    });
+
+    testWidgets('ohne zweite Aktion geht nur nach links', (tester) async {
+      var deleted = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SwipeRevealDelete(
+              itemKey: 'a',
+              enabled: true,
+              onDelete: () => deleted++,
+              child: const SizedBox(
+                height: 60,
+                child: Center(child: Text('Song A')),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.drag(find.text('Song A'), const Offset(200, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Löschen'), findsNothing);
+      expect(deleted, 0);
+    });
+  });
 }

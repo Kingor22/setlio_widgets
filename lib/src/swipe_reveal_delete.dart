@@ -25,6 +25,9 @@ class SwipeRevealDelete extends StatefulWidget {
     this.label = 'Löschen',
     this.icon = Icons.delete_outline,
     this.borderRadius = 11,
+    this.leadingLabel,
+    this.leadingIcon,
+    this.onLeading,
   });
 
   /// Identität der Zeile — daran erkennt die Komponente, ob eine ANDERE
@@ -40,6 +43,13 @@ class SwipeRevealDelete extends StatefulWidget {
   final IconData icon;
   final double borderRadius;
 
+  /// Zweite Aktion in der Gegenrichtung (nach rechts wischen), z. B.
+  /// „In Ordner". Nicht destruktiv, deshalb im Akzent statt in Rot.
+  /// Ohne [onLeading] lässt sich nur nach links wischen.
+  final String? leadingLabel;
+  final IconData? leadingIcon;
+  final VoidCallback? onLeading;
+
   @override
   State<SwipeRevealDelete> createState() => _SwipeRevealDeleteState();
 }
@@ -53,10 +63,17 @@ class _SwipeRevealDeleteState extends State<SwipeRevealDelete>
     with SingleTickerProviderStateMixin {
   static const _actionWidth = 92.0;
 
+  /// Negativ = Aktion links freigelegt (nach rechts gewischt),
+  /// positiv = Löschfeld rechts freigelegt.
   late final AnimationController _controller = AnimationController(
     vsync: this,
+    lowerBound: -1,
+    upperBound: 1,
+    value: 0,
     duration: const Duration(milliseconds: 180),
   );
+
+  bool get _hasLeading => widget.onLeading != null;
 
   bool get _isOpen => _openItem.value == widget.itemKey;
 
@@ -68,11 +85,8 @@ class _SwipeRevealDeleteState extends State<SwipeRevealDelete>
 
   void _onOpenItemChanged() {
     if (!mounted) return;
-    if (_isOpen) {
-      _controller.forward();
-    } else if (_controller.value != 0) {
-      _controller.reverse();
-    }
+    if (_isOpen) return;
+    if (_controller.value != 0) _controller.animateTo(0);
   }
 
   @override
@@ -101,7 +115,7 @@ class _SwipeRevealDeleteState extends State<SwipeRevealDelete>
     if (!widget.enabled) return;
     // Nach links zieht auf, nach rechts wieder zu.
     final next = _controller.value - details.primaryDelta! / _actionWidth;
-    _controller.value = next.clamp(0.0, 1.0);
+    _controller.value = next.clamp(_hasLeading ? -1.0 : 0.0, 1.0);
   }
 
   void _onDragEnd(DragEndDetails details) {
@@ -131,19 +145,22 @@ class _SwipeRevealDeleteState extends State<SwipeRevealDelete>
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
-          final offset = -_actionWidth * _controller.value;
+          final value = _controller.value;
+          final offset = -_actionWidth * value;
           return Stack(
             children: [
-              // Löschfeld liegt hinter der Zeile und wird freigelegt.
+              // Die Aktionsfelder liegen hinter der Zeile und werden
+              // durch das Verschieben freigelegt.
               Positioned.fill(
                 child: Align(
                   alignment: Alignment.centerRight,
-                  child: _DeleteAction(
+                  child: _SwipeAction(
                     width: _actionWidth,
-                    visible: _controller.value > 0,
+                    visible: value > 0,
                     label: widget.label,
                     icon: widget.icon,
                     borderRadius: widget.borderRadius,
+                    color: const Color(DesignTokens.red),
                     onTap: () {
                       _close();
                       widget.onDelete();
@@ -151,9 +168,27 @@ class _SwipeRevealDeleteState extends State<SwipeRevealDelete>
                   ),
                 ),
               ),
+              if (_hasLeading)
+                Positioned.fill(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _SwipeAction(
+                      width: _actionWidth,
+                      visible: value < 0,
+                      label: widget.leadingLabel ?? '',
+                      icon: widget.leadingIcon ?? Icons.folder_outlined,
+                      borderRadius: widget.borderRadius,
+                      color: const Color(DesignTokens.accent),
+                      onTap: () {
+                        _close();
+                        widget.onLeading!();
+                      },
+                    ),
+                  ),
+                ),
               Transform.translate(
                 offset: Offset(offset, 0),
-                child: _controller.value == 0
+                child: value == 0
                     ? widget.child
                     // Offen: ein Tipp auf die Zeile schliesst nur, statt
                     // sie zu öffnen — wie auf iOS.
@@ -171,13 +206,14 @@ class _SwipeRevealDeleteState extends State<SwipeRevealDelete>
   }
 }
 
-class _DeleteAction extends StatelessWidget {
-  const _DeleteAction({
+class _SwipeAction extends StatelessWidget {
+  const _SwipeAction({
     required this.width,
     required this.visible,
     required this.label,
     required this.icon,
     required this.borderRadius,
+    required this.color,
     required this.onTap,
   });
 
@@ -186,6 +222,7 @@ class _DeleteAction extends StatelessWidget {
   final String label;
   final IconData icon;
   final double borderRadius;
+  final Color color;
   final VoidCallback onTap;
 
   @override
