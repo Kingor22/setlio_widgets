@@ -14,3 +14,4 @@ export 'src/shared_step_button.dart';
 export 'src/shared_subdivision_picker.dart';
 export 'src/shared_tap_tempo_button.dart';
 export 'src/shared_wheel_picker.dart';
+export 'src/swipe_reveal_delete.dart';
