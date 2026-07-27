@@ -65,6 +65,10 @@ class GrowVeil extends StatelessWidget {
     this.chipKey,
     this.enabled = true,
     this.borderRadius = DesignTokens.radiusButton,
+    this.secondaryLabel,
+    this.secondaryIcon,
+    this.secondaryOnTap,
+    this.secondaryChipKey,
   });
 
   final Animation<double> animation;
@@ -82,12 +86,25 @@ class GrowVeil extends StatelessWidget {
   /// aufliegt (Setlio: Buttons/Felder, Setronome: Karten).
   final double borderRadius;
 
+  /// Zweite Aktion auf dem gehaltenen Balken, z. B. „bearbeiten" neben
+  /// „ersetzen". Ohne diese Angaben verhält sich der Schleier exakt wie
+  /// vorher: ein Chip, und die ganze Fläche löst ihn aus.
+  ///
+  /// Mit zweiter Aktion sind NUR die Chips antippbar – ein Tipp daneben
+  /// tut nichts. Bei zwei gleichwertigen Möglichkeiten wäre es sonst
+  /// Zufall, welche man auslöst.
+  final String? secondaryLabel;
+  final IconData? secondaryIcon;
+  final VoidCallback? secondaryOnTap;
+  final Key? secondaryChipKey;
+
   @override
   Widget build(BuildContext context) {
     final accent = enabled
         ? Theme.of(context).colorScheme.primary
         : Theme.of(context).disabledColor;
     final surface = Theme.of(context).colorScheme.surface;
+    final hasSecondary = secondaryLabel != null && secondaryIcon != null;
     return Stack(
       children: [
         child,
@@ -96,7 +113,9 @@ class GrowVeil extends StatelessWidget {
             opacity: animation,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: onTap,
+              // Mit zwei Chips darf die Fläche nichts auslösen, sonst
+              // wäre es Zufall, welche Aktion man erwischt.
+              onTap: hasSecondary ? () {} : onTap,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(borderRadius),
@@ -104,29 +123,37 @@ class GrowVeil extends StatelessWidget {
                   color: accent.withValues(alpha: 0.08),
                 ),
                 child: Center(
-                  child: DecoratedBox(
-                    key: chipKey,
-                    decoration: BoxDecoration(
-                      color: surface.withValues(alpha: 0.92),
-                      borderRadius: const BorderRadius.all(Radius.circular(20)),
-                      border: Border.all(color: accent, width: 1),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 6,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(icon, size: 16, color: accent),
-                          const SizedBox(width: 6),
-                          Text(
-                            label,
-                            style: TextStyle(color: accent, fontSize: 13),
+                  // Zwei Chips („ersetzen" + „bearbeiten") sind auf
+                  // schmalen Telefonen breiter als die Zeile. Lieber
+                  // gemeinsam etwas kleiner skalieren als abschneiden —
+                  // beide Beschriftungen müssen lesbar bleiben.
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _chip(
+                          key: chipKey,
+                          icon: icon,
+                          label: label,
+                          accent: accent,
+                          surface: surface,
+                          // Ohne zweite Aktion fängt die ganze Fläche den
+                          // Tipp – dann braucht der Chip keinen eigenen.
+                          onTap: hasSecondary ? onTap : null,
+                        ),
+                        if (hasSecondary) ...[
+                          const SizedBox(width: 8),
+                          _chip(
+                            key: secondaryChipKey,
+                            icon: secondaryIcon!,
+                            label: secondaryLabel!,
+                            accent: accent,
+                            surface: surface,
+                            onTap: secondaryOnTap,
                           ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
                 ),
@@ -137,6 +164,42 @@ class GrowVeil extends StatelessWidget {
       ],
     );
   }
+}
+
+Widget _chip({
+  required Key? key,
+  required IconData icon,
+  required String label,
+  required Color accent,
+  required Color surface,
+  required VoidCallback? onTap,
+}) {
+  final chip = DecoratedBox(
+    key: key,
+    decoration: BoxDecoration(
+      color: surface.withValues(alpha: 0.92),
+      borderRadius: const BorderRadius.all(Radius.circular(20)),
+      border: Border.all(color: accent, width: 1),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: accent),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(color: accent, fontSize: 13)),
+        ],
+      ),
+    ),
+  );
+  return onTap == null
+      ? chip
+      : GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: chip,
+        );
 }
 
 /// Options-Schaltfläche der Grow-Bereiche. [onTap] null = ausgegraut
@@ -225,6 +288,44 @@ class InlineMenuController extends ChangeNotifier {
   String? _openId;
   double _scrollDelta = 0;
 
+  // Der Scroll wird NICHT als zweite Animation gefahren, sondern direkt an
+  // die Auf-/Zu-Animation gekoppelt: bei jedem Tick wird der Offset auf
+  // den passenden Zwischenwert gesetzt. Zwei parallele Animationen mit
+  // gleicher Dauer starten sonst einen Frame versetzt — dann klappt das
+  // Menü sichtbar auf und der Scroll zieht erst hinterher nach.
+  ScrollController? _syncedScroll;
+  double _syncStartPixels = 0;
+  bool _syncing = false;
+
+  void _tickScroll() {
+    final controller = _syncedScroll;
+    if (!_syncing || controller == null || !controller.hasClients) return;
+    final target = _syncStartPixels + _scrollDelta * animation.value;
+    final position = controller.position;
+    controller.jumpTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
+    );
+  }
+
+  void _startScrollSync(ScrollController? controller, double delta) {
+    _stopScrollSync();
+    if (controller == null || !controller.hasClients || delta.abs() <= 0.5) {
+      return;
+    }
+    _syncedScroll = controller;
+    _syncStartPixels = controller.position.pixels;
+    _scrollDelta = delta;
+    _syncing = true;
+    animation.addListener(_tickScroll);
+  }
+
+  void _stopScrollSync() {
+    if (!_syncing) return;
+    animation.removeListener(_tickScroll);
+    _syncing = false;
+    _syncedScroll = null;
+  }
+
   // Gemerkter Wunsch, während das vorherige Menü noch zufährt.
   String? _pendingId;
   BuildContext? _pendingContext;
@@ -258,31 +359,23 @@ class InlineMenuController extends ChangeNotifier {
             sectionHeight: sectionHeight,
           );
     _openId = id;
-    _scrollDelta = delta;
     notifyListeners();
+    _startScrollSync(scrollController, delta);
     _controller.forward(from: 0);
-    if (position != null && delta.abs() > 0.5) {
-      scrollController!.animateTo(
-        (position.pixels + delta).clamp(0.0, double.infinity),
-        duration: duration,
-        curve: Curves.easeOutCubic,
-      );
-    }
   }
 
   /// Schließt das offene Menü und fährt den Scroll-Ausgleich zurück.
   void close({ScrollController? scrollController}) {
     if (_openId == null) return;
-    final delta = _scrollDelta;
-    _scrollDelta = 0;
-    if ((scrollController?.hasClients ?? false) && delta.abs() > 0.5) {
-      scrollController!.animateTo(
-        (scrollController.position.pixels - delta).clamp(0.0, double.infinity),
-        duration: duration,
-        curve: Curves.easeInCubic,
-      );
+    // Der Sync läuft rückwärts weiter: animation.value fällt auf 0, der
+    // Offset landet damit wieder auf dem Ausgangswert. Basis neu setzen,
+    // falls zwischendurch von Hand gescrollt wurde — sonst spränge es.
+    final synced = _syncedScroll;
+    if (_syncing && (synced?.hasClients ?? false)) {
+      _syncStartPixels = synced!.position.pixels - _scrollDelta;
     }
     _controller.reverse().whenComplete(() {
+      _stopScrollSync();
       _openId = null;
       notifyListeners();
       final id = _pendingId;
@@ -340,6 +433,7 @@ class InlineMenuController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _stopScrollSync();
     animation.dispose();
     _controller.dispose();
     super.dispose();
