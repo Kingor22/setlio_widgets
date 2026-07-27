@@ -28,6 +28,7 @@ class SwipeRevealDelete extends StatefulWidget {
     this.leadingLabel,
     this.leadingIcon,
     this.onLeading,
+    this.leadingColor = const Color(0xFF4EA8DE),
   });
 
   /// Identität der Zeile — daran erkennt die Komponente, ob eine ANDERE
@@ -49,6 +50,11 @@ class SwipeRevealDelete extends StatefulWidget {
   final String? leadingLabel;
   final IconData? leadingIcon;
   final VoidCallback? onLeading;
+
+  /// Himmelblau statt Rot: die Aktion ist nicht destruktiv, und sie darf
+  /// auch nicht mit dem Türkis verwechselt werden — das steht in
+  /// Setronome für „verweist auf Setlio".
+  final Color leadingColor;
 
   @override
   State<SwipeRevealDelete> createState() => _SwipeRevealDeleteState();
@@ -111,35 +117,66 @@ class _SwipeRevealDeleteState extends State<SwipeRevealDelete>
     if (_isOpen) _openItem.value = null;
   }
 
+  /// Zustand beim Beginn der Geste. Eine Geste darf immer nur EINEN
+  /// Schritt weit gehen: aus dem offenen Löschfeld führt ein Wisch nach
+  /// rechts zurück auf neutral — und nicht in einem Zug weiter zur
+  /// Ordner-Aktion. Sonst kommt man aus der Ansicht nicht mehr heraus.
+  double _dragStart = 0;
+
+  void _onDragStart(DragStartDetails details) {
+    _dragStart = _controller.value;
+  }
+
+  /// Erlaubter Bereich dieser Geste — abhängig davon, wo sie begann.
+  (double, double) get _dragBounds {
+    if (_dragStart > 0.5) return (0, 1); // offen: nur zumachen
+    if (_dragStart < -0.5) return (-1, 0); // Ordner offen: nur zumachen
+    return (_hasLeading ? -1.0 : 0.0, 1.0); // neutral: beide Richtungen
+  }
+
   void _onDragUpdate(DragUpdateDetails details) {
     if (!widget.enabled) return;
     // Nach links zieht auf, nach rechts wieder zu.
     final next = _controller.value - details.primaryDelta! / _actionWidth;
-    _controller.value = next.clamp(_hasLeading ? -1.0 : 0.0, 1.0);
+    final (lower, upper) = _dragBounds;
+    _controller.value = next.clamp(lower, upper);
   }
 
   void _onDragEnd(DragEndDetails details) {
     if (!widget.enabled) return;
     final velocity = details.primaryVelocity ?? 0;
-    // Schneller Zug entscheidet, sonst die halbe Strecke. Ein voller Zug
-    // löst NICHTS aus — er öffnet nur.
-    final shouldOpen = velocity < -300
-        ? true
-        : velocity > 300
-            ? false
-            : _controller.value > 0.5;
-    if (shouldOpen) {
-      _open();
-      _controller.forward();
+    final value = _controller.value;
+    final (lower, upper) = _dragBounds;
+
+    // Schwung entscheidet, sonst die halbe Strecke. Ein voller Zug löst
+    // NICHTS aus — er öffnet nur.
+    final double target;
+    if (velocity < -300) {
+      target = upper;
+    } else if (velocity > 300) {
+      target = lower;
+    } else if (value > 0.5) {
+      target = 1;
+    } else if (value < -0.5) {
+      target = -1;
     } else {
-      _close();
-      _controller.reverse();
+      target = 0;
     }
+
+    // NICHT forward()/reverse(): die laufen auf die Grenzen des
+    // Controllers (-1 bzw. 1) und träfen die Mitte nie.
+    if (target == 0) {
+      _close();
+    } else {
+      _open();
+    }
+    _controller.animateTo(target);
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      onHorizontalDragStart: _onDragStart,
       onHorizontalDragUpdate: _onDragUpdate,
       onHorizontalDragEnd: _onDragEnd,
       child: AnimatedBuilder(
@@ -178,7 +215,7 @@ class _SwipeRevealDeleteState extends State<SwipeRevealDelete>
                       label: widget.leadingLabel ?? '',
                       icon: widget.leadingIcon ?? Icons.folder_outlined,
                       borderRadius: widget.borderRadius,
-                      color: const Color(DesignTokens.accent),
+                      color: widget.leadingColor,
                       onTap: () {
                         _close();
                         widget.onLeading!();

@@ -194,4 +194,92 @@ void main() {
       expect(deleted, 0);
     });
   });
+
+  group('eine Geste, ein Schritt', () {
+    Widget hostBoth(List<String> log) => MaterialApp(
+          home: Scaffold(
+            body: SwipeRevealDelete(
+              itemKey: 'a',
+              enabled: true,
+              onDelete: () => log.add('delete'),
+              leadingLabel: 'In Ordner',
+              leadingIcon: Icons.folder_outlined,
+              onLeading: () => log.add('folder'),
+              child: const SizedBox(
+                height: 60,
+                child: Center(child: Text('Song A')),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets(
+        'aus dem offenen Löschfeld führt ein Wisch nach rechts '
+        'zurück auf neutral — nicht weiter zum Ordner', (tester) async {
+      final log = <String>[];
+      await tester.pumpWidget(hostBoth(log));
+
+      await tester.drag(find.text('Song A'), const Offset(-120, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Löschen'), findsOneWidget);
+
+      // Derselbe Zug zurück: früher lief der Controller bis an seine
+      // untere Grenze durch und legte die Ordner-Aktion frei — man kam
+      // aus der Ansicht gar nicht mehr heraus.
+      await tester.drag(
+        find.text('Song A'),
+        const Offset(200, 0),
+        warnIfMissed: false,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Löschen'), findsNothing);
+      expect(find.text('In Ordner'), findsNothing,
+          reason: 'neutral, nicht Ordner');
+      expect(log, isEmpty);
+    });
+
+    testWidgets('erst der zweite Wisch nach rechts zeigt den Ordner', (
+      tester,
+    ) async {
+      final log = <String>[];
+      await tester.pumpWidget(hostBoth(log));
+
+      await tester.drag(find.text('Song A'), const Offset(-120, 0));
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.text('Song A'),
+        const Offset(200, 0),
+        warnIfMissed: false,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('In Ordner'), findsNothing);
+
+      await tester.drag(find.text('Song A'), const Offset(120, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('In Ordner'), findsOneWidget);
+      expect(log, isEmpty);
+    });
+
+    testWidgets('aus dem offenen Ordner führt ein Wisch nach links zurück', (
+      tester,
+    ) async {
+      final log = <String>[];
+      await tester.pumpWidget(hostBoth(log));
+
+      await tester.drag(find.text('Song A'), const Offset(120, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('In Ordner'), findsOneWidget);
+
+      await tester.drag(
+        find.text('Song A'),
+        const Offset(-200, 0),
+        warnIfMissed: false,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('In Ordner'), findsNothing);
+      expect(find.text('Löschen'), findsNothing);
+      expect(log, isEmpty);
+    });
+  });
 }
