@@ -7,6 +7,7 @@
 library;
 
 export 'src/shared_accent_beat_picker.dart';
+export 'src/shared_bar_overrides_editor.dart';
 export 'src/shared_card_chrome.dart';
 export 'src/shared_inline_grow_menu.dart';
 export 'src/shared_removable_tag_chip.dart';
