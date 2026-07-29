@@ -265,9 +265,9 @@ class GrowOptionButton extends StatelessWidget {
 /// [onTap] null = ausgegraut (keine Bearbeitungsrechte).
 class GrowInsertArrowButton extends StatelessWidget {
   const GrowInsertArrowButton.before({super.key, required this.onTap})
-    : up = true;
+      : up = true;
   const GrowInsertArrowButton.after({super.key, required this.onTap})
-    : up = false;
+      : up = false;
 
   final bool up;
   final VoidCallback? onTap;
