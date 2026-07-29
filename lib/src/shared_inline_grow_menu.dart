@@ -232,6 +232,45 @@ class GrowOptionButton extends StatelessWidget {
   }
 }
 
+/// SETLIO-UI: Pfeil-Schaltfläche für „Davor/Danach einfügen" — die
+/// sichtbare Text-Beschriftung entfällt, der Pfeil steht zentriert
+/// (oben = davor, unten = danach). VoiceOver liest weiterhin den
+/// vollen Text, Tap-Ziel mindestens 44×44 pt. EIN gemeinsames Widget
+/// für alle Inline-Menüs mit beidseitigem Einfügen — keine Kopien.
+/// [onTap] null = ausgegraut (keine Bearbeitungsrechte).
+class GrowInsertArrowButton extends StatelessWidget {
+  const GrowInsertArrowButton.before({super.key, required this.onTap})
+    : up = true;
+  const GrowInsertArrowButton.after({super.key, required this.onTap})
+    : up = false;
+
+  final bool up;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = up ? 'Davor einfügen' : 'Danach einfügen';
+    return Expanded(
+      child: Tooltip(
+        message: label,
+        child: OutlinedButton(
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(44, 44),
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+          ),
+          child: Icon(
+            up ? Icons.arrow_upward : Icons.arrow_downward,
+            size: 18,
+            semanticLabel: label,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Scroll-Weg beim Öffnen: Ideal bleibt der gehaltene Balken exakt
 /// stehen (Scroll += eine Bereichshöhe — die Liste darüber rückt hoch,
 /// darunter runter); an den Rändern wird so verschoben, dass das
