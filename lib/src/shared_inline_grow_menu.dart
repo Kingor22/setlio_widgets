@@ -293,28 +293,78 @@ class InlineMenuController extends ChangeNotifier {
   // den passenden Zwischenwert gesetzt. Zwei parallele Animationen mit
   // gleicher Dauer starten sonst einen Frame versetzt — dann klappt das
   // Menü sichtbar auf und der Scroll zieht erst hinterher nach.
+  //
+  // SET-52: Der Ausgleich stützt sich auf die GEMESSENE Lage der
+  // gehaltenen Zeile (jeden Tick neu), nicht auf vorausberechnete
+  // absolute Offsets. Lazy-Listen mit dynamischen Zeilenhöhen
+  // (aufgeklappte Medleys!) schätzen die Geometrie abseits des
+  // Viewports nur — absolute Ziele gegen `maxScrollExtent` gerechnet
+  // sprangen dann willkürlich, sobald der Sliver seine Schätzung
+  // mitten in der Animation korrigierte.
   ScrollController? _syncedScroll;
   double _syncStartPixels = 0;
   bool _syncing = false;
 
+  /// Gemessener Anker: Kontext der gehaltenen Zeile (ihr RenderObject
+  /// umfasst auch die wachsenden Menü-Bereiche), Start-Lage im Viewport
+  /// und gewünschte Verschiebung je Animationswert.
+  BuildContext? _anchorContext;
+  double _anchorStartY = 0;
+  double _anchorShiftPerValue = 0;
+
+  /// Aktuelle Viewport-Lage des Ankers — null, wenn nicht messbar
+  /// (Zeile aus dem Baum gefallen o. ä.); dann greift der alte
+  /// Interpolations-Fallback.
+  double? _measuredAnchorY(ScrollPosition position) {
+    final context = _anchorContext;
+    if (context == null || !context.mounted) return null;
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached) return null;
+    final viewport = RenderAbstractViewport.maybeOf(box);
+    if (viewport == null) return null;
+    return viewport.getOffsetToReveal(box, 0).offset - position.pixels;
+  }
+
   void _tickScroll() {
     final controller = _syncedScroll;
     if (!_syncing || controller == null || !controller.hasClients) return;
-    final target = _syncStartPixels + _scrollDelta * animation.value;
     final position = controller.position;
+
+    final measured = _measuredAnchorY(position);
+    if (measured != null) {
+      final targetY = _anchorStartY + _anchorShiftPerValue * animation.value;
+      final correction = measured - targetY;
+      if (correction.abs() > 0.25) {
+        controller.jumpTo(
+          (position.pixels + correction).clamp(
+            position.minScrollExtent,
+            position.maxScrollExtent,
+          ),
+        );
+      }
+      return;
+    }
+
+    final target = _syncStartPixels + _scrollDelta * animation.value;
     controller.jumpTo(
       target.clamp(position.minScrollExtent, position.maxScrollExtent),
     );
   }
 
-  void _startScrollSync(ScrollController? controller, double delta) {
+  void _startScrollSync(
+    ScrollController? controller,
+    double delta, {
+    BuildContext? anchorContext,
+    double anchorShiftPerValue = 0,
+  }) {
     _stopScrollSync();
-    if (controller == null || !controller.hasClients || delta.abs() <= 0.5) {
-      return;
-    }
+    if (controller == null || !controller.hasClients) return;
     _syncedScroll = controller;
     _syncStartPixels = controller.position.pixels;
     _scrollDelta = delta;
+    _anchorContext = anchorContext;
+    _anchorShiftPerValue = anchorShiftPerValue;
+    _anchorStartY = _measuredAnchorY(controller.position) ?? 0;
     _syncing = true;
     animation.addListener(_tickScroll);
   }
@@ -324,6 +374,7 @@ class InlineMenuController extends ChangeNotifier {
     animation.removeListener(_tickScroll);
     _syncing = false;
     _syncedScroll = null;
+    _anchorContext = null;
   }
 
   // Gemerkter Wunsch, während das vorherige Menü noch zufährt.
@@ -358,9 +409,42 @@ class InlineMenuController extends ChangeNotifier {
             position: position,
             sectionHeight: sectionHeight,
           );
+
+    // SET-52: gewünschte End-Verschiebung der gehaltenen Zeile — rein
+    // aus GEMESSENER Geometrie (Zeilenlage + Viewporthöhe), ohne die
+    // unzuverlässigen Extent-Schätzungen der Lazy-Liste. 0 = Fixpunkt;
+    // an den Rändern nur die minimale Sichtbarkeits-Korrektur.
+    var rowShift = 0.0;
+    if (position != null) {
+      final box = itemContext.findRenderObject();
+      if (box is RenderBox) {
+        final viewport = RenderAbstractViewport.maybeOf(box);
+        if (viewport != null) {
+          final y0 =
+              viewport.getOffsetToReveal(box, 0).offset - position.pixels;
+          final rowH = box.size.height;
+          final h = position.viewportDimension;
+          if (y0 < sectionHeight) {
+            rowShift = sectionHeight - y0; // Menü oben freischieben
+          } else if (y0 + rowH + sectionHeight > h) {
+            rowShift = (h - rowH - sectionHeight) - y0; // unten freischieben
+          }
+        }
+      }
+    }
+
     _openId = id;
     notifyListeners();
-    _startScrollSync(scrollController, delta);
+    // Der Anker (Zeile SAMT wachsender Bereiche) wandert je Wert um
+    // (rowShift − sectionHeight): der obere Bereich wächst aus der
+    // Zeilen-Oberkante, die Spaltenoberkante liegt also am Ende genau
+    // eine Bereichshöhe über der Zeile.
+    _startScrollSync(
+      scrollController,
+      delta,
+      anchorContext: itemContext,
+      anchorShiftPerValue: rowShift - sectionHeight,
+    );
     _controller.forward(from: 0);
   }
 
@@ -373,6 +457,12 @@ class InlineMenuController extends ChangeNotifier {
     final synced = _syncedScroll;
     if (_syncing && (synced?.hasClients ?? false)) {
       _syncStartPixels = synced!.position.pixels - _scrollDelta;
+      // SET-52: auch den gemessenen Anker neu einhängen — die Zeile
+      // bleibt beim Zufahren ab ihrer JETZIGEN Lage der Fixpunkt.
+      final measured = _measuredAnchorY(synced.position);
+      if (measured != null) {
+        _anchorStartY = measured - _anchorShiftPerValue * animation.value;
+      }
     }
     _controller.reverse().whenComplete(() {
       _stopScrollSync();
