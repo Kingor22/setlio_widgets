@@ -69,6 +69,10 @@ class GrowVeil extends StatelessWidget {
     this.secondaryIcon,
     this.secondaryOnTap,
     this.secondaryChipKey,
+    this.tertiaryLabel,
+    this.tertiaryIcon,
+    this.tertiaryOnTap,
+    this.tertiaryChipKey,
   });
 
   final Animation<double> animation;
@@ -98,6 +102,14 @@ class GrowVeil extends StatelessWidget {
   final VoidCallback? secondaryOnTap;
   final Key? secondaryChipKey;
 
+  /// Optionale dritte Aktion (SET-UI: „Ins Metronom") — gleiche Regeln
+  /// wie bei der zweiten: sobald mehr als ein Chip da ist, sind nur die
+  /// Chips antippbar.
+  final String? tertiaryLabel;
+  final IconData? tertiaryIcon;
+  final VoidCallback? tertiaryOnTap;
+  final Key? tertiaryChipKey;
+
   @override
   Widget build(BuildContext context) {
     final accent = enabled
@@ -105,6 +117,8 @@ class GrowVeil extends StatelessWidget {
         : Theme.of(context).disabledColor;
     final surface = Theme.of(context).colorScheme.surface;
     final hasSecondary = secondaryLabel != null && secondaryIcon != null;
+    final hasTertiary = tertiaryLabel != null && tertiaryIcon != null;
+    final multi = hasSecondary || hasTertiary;
     return Stack(
       children: [
         child,
@@ -115,7 +129,7 @@ class GrowVeil extends StatelessWidget {
               behavior: HitTestBehavior.opaque,
               // Mit zwei Chips darf die Fläche nichts auslösen, sonst
               // wäre es Zufall, welche Aktion man erwischt.
-              onTap: hasSecondary ? () {} : onTap,
+              onTap: multi ? () {} : onTap,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(borderRadius),
@@ -140,7 +154,7 @@ class GrowVeil extends StatelessWidget {
                           surface: surface,
                           // Ohne zweite Aktion fängt die ganze Fläche den
                           // Tipp – dann braucht der Chip keinen eigenen.
-                          onTap: hasSecondary ? onTap : null,
+                          onTap: multi ? onTap : null,
                         ),
                         if (hasSecondary) ...[
                           const SizedBox(width: 8),
@@ -151,6 +165,17 @@ class GrowVeil extends StatelessWidget {
                             accent: accent,
                             surface: surface,
                             onTap: secondaryOnTap,
+                          ),
+                        ],
+                        if (hasTertiary) ...[
+                          const SizedBox(width: 8),
+                          _chip(
+                            key: tertiaryChipKey,
+                            icon: tertiaryIcon!,
+                            label: tertiaryLabel!,
+                            accent: accent,
+                            surface: surface,
+                            onTap: tertiaryOnTap,
                           ),
                         ],
                       ],
