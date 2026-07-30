@@ -26,6 +26,7 @@ class SharedTapTempoButton extends StatefulWidget {
     required this.onTappingChanged,
     this.enabled = true,
     this.large = false,
+    this.bare = false,
   });
 
   final void Function(double bpm) onBpmCalculated;
@@ -35,6 +36,11 @@ class SharedTapTempoButton extends StatefulWidget {
   /// Größerer Footprint, wenn der Button die Haupt-Tempo-Eingabe ist
   /// (Metronom-Home); kompakt neben BPM-Feld + Steppern (Song-Editor).
   final bool large;
+
+  /// SET-62: NUR das Wort „Tap" — ohne Button-Chrome (Karte/Rand/
+  /// Padding). Für das Drehrad-Zentrum, wo das Rad selbst der sichtbare
+  /// Rahmen ist; Tap-Verhalten unverändert.
+  final bool bare;
 
   @override
   State<SharedTapTempoButton> createState() => _SharedTapTempoButtonState();
@@ -98,25 +104,31 @@ class _SharedTapTempoButtonState extends State<SharedTapTempoButton> {
         ? const EdgeInsets.symmetric(horizontal: 40, vertical: 28)
         : const EdgeInsets.symmetric(horizontal: 24, vertical: 16);
 
+    final label = Text(
+      'Tap',
+      style: TextStyle(
+        color: foreground,
+        fontSize: widget.large ? 22 : 16,
+        fontWeight: FontWeight.w300,
+      ),
+    );
+
     return GestureDetector(
       onTap: widget.enabled ? _onTap : null,
+      // bare: großzügige unsichtbare Tap-Fläche statt Button-Karte.
+      behavior: widget.bare ? HitTestBehavior.opaque : null,
       child: Opacity(
         opacity: widget.enabled ? 1.0 : 0.4,
-        child: Container(
-          padding: padding,
-          decoration: sharedCardDecoration(
-            context,
-            radius: DesignTokens.radiusButton,
-          ),
-          child: Text(
-            'Tap',
-            style: TextStyle(
-              color: foreground,
-              fontSize: widget.large ? 22 : 16,
-              fontWeight: FontWeight.w300,
-            ),
-          ),
-        ),
+        child: widget.bare
+            ? Padding(padding: padding, child: label)
+            : Container(
+                padding: padding,
+                decoration: sharedCardDecoration(
+                  context,
+                  radius: DesignTokens.radiusButton,
+                ),
+                child: label,
+              ),
       ),
     );
   }
