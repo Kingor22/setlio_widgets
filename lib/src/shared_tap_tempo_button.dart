@@ -120,7 +120,9 @@ class _SharedTapTempoButtonState extends State<SharedTapTempoButton> {
       child: Opacity(
         opacity: widget.enabled ? 1.0 : 0.4,
         child: widget.bare
-            ? Padding(padding: padding, child: label)
+            // Füllt die vom Aufrufer gegebene Box vollständig als
+            // Tap-Fläche; die Schrift bleibt mittig und unverändert.
+            ? Container(alignment: Alignment.center, child: label)
             : Container(
                 padding: padding,
                 decoration: sharedCardDecoration(
