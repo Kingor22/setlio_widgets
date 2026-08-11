@@ -41,12 +41,19 @@ class GrowSection extends StatelessWidget {
     // Bewusst OHNE ScaleTransition: skalierter Text liegt zwischen dem
     // Pixelraster und verwischt während der Animation — Wachsen (Size)
     // plus Einblenden reicht für den Grow-Effekt und bleibt scharf.
-    return SizeTransition(
-      sizeFactor: animation,
-      alignment: above ? Alignment.bottomCenter : Alignment.topCenter,
-      child: FadeTransition(
-        opacity: animation,
-        child: SizedBox(height: height, child: child),
+    // Die gemeinsame Animation ist zugleich die Kennung der Menü-Region
+    // (11.08.): Alle Teile EINES Menüs melden sich damit als eine
+    // Region an, und der Fänger in [InlineMenuController] weiß, was
+    // „außerhalb" heißt.
+    return TapRegion(
+      groupId: animation,
+      child: SizeTransition(
+        sizeFactor: animation,
+        alignment: above ? Alignment.bottomCenter : Alignment.topCenter,
+        child: FadeTransition(
+          opacity: animation,
+          child: SizedBox(height: height, child: child),
+        ),
       ),
     );
   }
@@ -119,92 +126,97 @@ class GrowVeil extends StatelessWidget {
     final hasSecondary = secondaryLabel != null && secondaryIcon != null;
     final hasTertiary = tertiaryLabel != null && tertiaryIcon != null;
     final multi = hasSecondary || hasTertiary;
-    return Stack(
-      children: [
-        child,
-        Positioned.fill(
-          // BUGFIX 11.08.: Der Schleier lag AUCH bei geschlossenem Menü
-          // über der Zeile. Unsichtbar (Deckkraft 0), aber undurchlässig
-          // — und damit fing er jeden Tipp und jedes Halten ab, das
-          // eigentlich dem Balken darunter galt. Sichtbare Folgen:
-          // In der Repertoire-Sidebar ließ sich weder das ＋ drücken noch
-          // der Ziehgriff greifen (kein Weg mehr, einen Song in die
-          // Setlist zu legen), und Ordner ließen sich nicht mehr halten,
-          // also weder umbenennen noch verschieben oder löschen.
-          //
-          // Deckkraft 0 heißt in Flutter NICHT „nicht da": Ein
-          // Opacity/FadeTransition mit 0 nimmt weiterhin an der
-          // Trefferprüfung teil. Deshalb der ausdrückliche Riegel —
-          // während der Einblendung (> 0) fängt der Schleier wie bisher
-          // alles ab, geschlossen ist er wirklich weg.
-          child: AnimatedBuilder(
-            animation: animation,
-            builder: (context, veil) => IgnorePointer(
-              ignoring: animation.value == 0,
-              child: FadeTransition(opacity: animation, child: veil),
-            ),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              // Mit zwei Chips darf die Fläche nichts auslösen, sonst
-              // wäre es Zufall, welche Aktion man erwischt.
-              onTap: multi ? () {} : onTap,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(borderRadius),
-                  border: Border.all(color: accent, width: 1.5),
-                  color: accent.withValues(alpha: 0.08),
-                ),
-                child: Center(
-                  // Zwei Chips („ersetzen" + „bearbeiten") sind auf
-                  // schmalen Telefonen breiter als die Zeile. Lieber
-                  // gemeinsam etwas kleiner skalieren als abschneiden —
-                  // beide Beschriftungen müssen lesbar bleiben.
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _chip(
-                          key: chipKey,
-                          icon: icon,
-                          label: label,
-                          accent: accent,
-                          surface: surface,
-                          // Ohne zweite Aktion fängt die ganze Fläche den
-                          // Tipp – dann braucht der Chip keinen eigenen.
-                          onTap: multi ? onTap : null,
-                        ),
-                        if (hasSecondary) ...[
-                          const SizedBox(width: 8),
+    return TapRegion(
+      // Gehört zur selben Region wie die Optionen darüber/darunter —
+      // ein Tipp HIER schließt also nicht (11.08.).
+      groupId: animation,
+      child: Stack(
+        children: [
+          child,
+          Positioned.fill(
+            // BUGFIX 11.08.: Der Schleier lag AUCH bei geschlossenem Menü
+            // über der Zeile. Unsichtbar (Deckkraft 0), aber undurchlässig
+            // — und damit fing er jeden Tipp und jedes Halten ab, das
+            // eigentlich dem Balken darunter galt. Sichtbare Folgen:
+            // In der Repertoire-Sidebar ließ sich weder das ＋ drücken noch
+            // der Ziehgriff greifen (kein Weg mehr, einen Song in die
+            // Setlist zu legen), und Ordner ließen sich nicht mehr halten,
+            // also weder umbenennen noch verschieben oder löschen.
+            //
+            // Deckkraft 0 heißt in Flutter NICHT „nicht da": Ein
+            // Opacity/FadeTransition mit 0 nimmt weiterhin an der
+            // Trefferprüfung teil. Deshalb der ausdrückliche Riegel —
+            // während der Einblendung (> 0) fängt der Schleier wie bisher
+            // alles ab, geschlossen ist er wirklich weg.
+            child: AnimatedBuilder(
+              animation: animation,
+              builder: (context, veil) => IgnorePointer(
+                ignoring: animation.value == 0,
+                child: FadeTransition(opacity: animation, child: veil),
+              ),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                // Mit zwei Chips darf die Fläche nichts auslösen, sonst
+                // wäre es Zufall, welche Aktion man erwischt.
+                onTap: multi ? () {} : onTap,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    border: Border.all(color: accent, width: 1.5),
+                    color: accent.withValues(alpha: 0.08),
+                  ),
+                  child: Center(
+                    // Zwei Chips („ersetzen" + „bearbeiten") sind auf
+                    // schmalen Telefonen breiter als die Zeile. Lieber
+                    // gemeinsam etwas kleiner skalieren als abschneiden —
+                    // beide Beschriftungen müssen lesbar bleiben.
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           _chip(
-                            key: secondaryChipKey,
-                            icon: secondaryIcon!,
-                            label: secondaryLabel!,
+                            key: chipKey,
+                            icon: icon,
+                            label: label,
                             accent: accent,
                             surface: surface,
-                            onTap: secondaryOnTap,
+                            // Ohne zweite Aktion fängt die ganze Fläche den
+                            // Tipp – dann braucht der Chip keinen eigenen.
+                            onTap: multi ? onTap : null,
                           ),
+                          if (hasSecondary) ...[
+                            const SizedBox(width: 8),
+                            _chip(
+                              key: secondaryChipKey,
+                              icon: secondaryIcon!,
+                              label: secondaryLabel!,
+                              accent: accent,
+                              surface: surface,
+                              onTap: secondaryOnTap,
+                            ),
+                          ],
+                          if (hasTertiary) ...[
+                            const SizedBox(width: 8),
+                            _chip(
+                              key: tertiaryChipKey,
+                              icon: tertiaryIcon!,
+                              label: tertiaryLabel!,
+                              accent: accent,
+                              surface: surface,
+                              onTap: tertiaryOnTap,
+                            ),
+                          ],
                         ],
-                        if (hasTertiary) ...[
-                          const SizedBox(width: 8),
-                          _chip(
-                            key: tertiaryChipKey,
-                            icon: tertiaryIcon!,
-                            label: tertiaryLabel!,
-                            accent: accent,
-                            surface: surface,
-                            onTap: tertiaryOnTap,
-                          ),
-                        ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -527,12 +539,17 @@ class InlineMenuController extends ChangeNotifier {
       anchorContext: itemContext,
       anchorShiftPerValue: rowShift - sectionHeight,
     );
+    // Ab jetzt schließt der erste Tipp irgendwo auf dem Bildschirm.
+    _armOutsideTap(itemContext);
     _controller.forward(from: 0);
   }
 
   /// Schließt das offene Menü und fährt den Scroll-Ausgleich zurück.
   void close({ScrollController? scrollController}) {
     if (_openId == null) return;
+    // Der Fänger geht sofort weg — während des Zufahrens gibt es nichts
+    // mehr abzufangen, und der nächste Tipp soll gleich wieder wirken.
+    _disarmOutsideTap();
     // Der Sync läuft rückwärts weiter: animation.value fällt auf 0, der
     // Offset landet damit wieder auf dem Ausgangswert. Basis neu setzen,
     // falls zwischendurch von Hand gescrollt wurde — sonst spränge es.
@@ -603,8 +620,48 @@ class InlineMenuController extends ChangeNotifier {
     }
   }
 
+  // ------------------------------------------------------------------
+  // DER ERSTE TIPP SCHLIESST — überall (Nutzer-Vorgabe 11.08.).
+  //
+  // Solange ein Menü offen ist, schließt ein Tipp IRGENDWO auf dem
+  // Bildschirm es und tut sonst NICHTS. Vorher galt das nur innerhalb
+  // der jeweiligen Liste — ein Tipp daneben (Metronom-Steuerung, Kopf-
+  // oder Fußleiste) ließ das Menü offen stehen und bediente das andere
+  // Element.
+  //
+  // Umgesetzt mit [TapRegion] statt mit einer Fläche über dem Bild: Die
+  // Menü-Teile ([GrowSection], [GrowVeil]) melden sich über ihre
+  // gemeinsame Animation als EINE Region an; die Anmeldung hier
+  // schluckt jeden Tipp außerhalb davon und schließt. Der Vorteil
+  // gegenüber einer Fläche mit ausgestanztem Loch: Es gibt nichts zu
+  // vermessen, und die Optionen bleiben erreichbar, egal wie weit sie
+  // über die gehaltene Zeile hinauswachsen.
+  OverlayEntry? _outsideTap;
+
+  void _armOutsideTap(BuildContext itemContext) {
+    _disarmOutsideTap();
+    final overlay = Overlay.maybeOf(itemContext, rootOverlay: true);
+    if (overlay == null) return; // Ohne Overlay bleibt alles wie bisher.
+    final entry = OverlayEntry(
+      builder: (context) => TapRegion(
+        groupId: animation,
+        consumeOutsideTaps: true,
+        onTapOutside: (_) => close(scrollController: _syncedScroll),
+        child: const SizedBox.shrink(),
+      ),
+    );
+    _outsideTap = entry;
+    overlay.insert(entry);
+  }
+
+  void _disarmOutsideTap() {
+    _outsideTap?.remove();
+    _outsideTap = null;
+  }
+
   @override
   void dispose() {
+    _disarmOutsideTap();
     _stopScrollSync();
     animation.dispose();
     _controller.dispose();
