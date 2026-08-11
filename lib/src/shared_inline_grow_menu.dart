@@ -123,8 +123,26 @@ class GrowVeil extends StatelessWidget {
       children: [
         child,
         Positioned.fill(
-          child: FadeTransition(
-            opacity: animation,
+          // BUGFIX 11.08.: Der Schleier lag AUCH bei geschlossenem Menü
+          // über der Zeile. Unsichtbar (Deckkraft 0), aber undurchlässig
+          // — und damit fing er jeden Tipp und jedes Halten ab, das
+          // eigentlich dem Balken darunter galt. Sichtbare Folgen:
+          // In der Repertoire-Sidebar ließ sich weder das ＋ drücken noch
+          // der Ziehgriff greifen (kein Weg mehr, einen Song in die
+          // Setlist zu legen), und Ordner ließen sich nicht mehr halten,
+          // also weder umbenennen noch verschieben oder löschen.
+          //
+          // Deckkraft 0 heißt in Flutter NICHT „nicht da": Ein
+          // Opacity/FadeTransition mit 0 nimmt weiterhin an der
+          // Trefferprüfung teil. Deshalb der ausdrückliche Riegel —
+          // während der Einblendung (> 0) fängt der Schleier wie bisher
+          // alles ab, geschlossen ist er wirklich weg.
+          child: AnimatedBuilder(
+            animation: animation,
+            builder: (context, veil) => IgnorePointer(
+              ignoring: animation.value == 0,
+              child: FadeTransition(opacity: animation, child: veil),
+            ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               // Mit zwei Chips darf die Fläche nichts auslösen, sonst

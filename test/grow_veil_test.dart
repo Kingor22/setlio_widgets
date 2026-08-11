@@ -93,4 +93,82 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  // BUGFIX 11.08.: Der Schleier lag auch bei GESCHLOSSENEM Menue ueber
+  // der Zeile — unsichtbar, aber undurchlaessig. Damit war jedes
+  // Bedienelement im Balken tot: das + der Repertoire-Sidebar, der
+  // Ziehgriff, das Gedrueckthalten einer Ordnerzeile.
+  testWidgets('geschlossenes Menue: der Balken bleibt bedienbar', (
+    tester,
+  ) async {
+    var kind = 0;
+    var schleier = 0;
+    var gehalten = 0;
+    await tester.pumpWidget(
+      host(
+        GrowVeil(
+          animation: const AlwaysStoppedAnimation(0),
+          label: 'Laden',
+          icon: Icons.play_arrow,
+          onTap: () => schleier++,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onLongPress: () => gehalten++,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                onTap: () => kind++,
+                child: const SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(Icons.add_circle_outline),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byIcon(Icons.add_circle_outline));
+    expect(kind, 1, reason: 'das + gehoert dem Balken, nicht dem Schleier');
+    expect(schleier, 0);
+
+    await tester.longPress(find.byType(GrowVeil));
+    expect(gehalten, 1, reason: 'Gedruecktes Halten muss durchkommen');
+  });
+
+  testWidgets('offenes Menue: der Schleier faengt wieder alles ab', (
+    tester,
+  ) async {
+    var kind = 0;
+    var schleier = 0;
+    await tester.pumpWidget(
+      host(
+        GrowVeil(
+          animation: const AlwaysStoppedAnimation(1),
+          label: 'Laden',
+          icon: Icons.play_arrow,
+          onTap: () => schleier++,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () => kind++,
+              child: const SizedBox(
+                width: 44,
+                height: 44,
+                child: Icon(Icons.add_circle_outline),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tapAt(
+      tester.getTopRight(find.byType(GrowVeil)) + const Offset(-8, 8),
+    );
+    expect(kind, 0, reason: 'bei offenem Menue ist der Balken stillgelegt');
+    expect(schleier, 1);
+  });
 }
