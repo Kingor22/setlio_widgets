@@ -71,7 +71,10 @@ void main() {
         .ancestor(of: find.text('Löschen'), matching: find.byType(ClipRect))
         .first;
 
-    await geste.moveBy(const Offset(-50, 0));
+    // Zwei Schritte: der erste gewinnt die Arena, der zweite bewegt.
+    await geste.moveBy(const Offset(-30, 0));
+    await tester.pump();
+    await geste.moveBy(const Offset(-30, 0));
     await tester.pump();
     final teilweise = tester.getSize(clip()).width;
     expect(teilweise, greaterThan(0));
