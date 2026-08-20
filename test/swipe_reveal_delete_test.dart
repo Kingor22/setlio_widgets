@@ -65,15 +65,21 @@ void main() {
     final geste = await tester.startGesture(
       tester.getCenter(find.text('Song A')),
     );
+    // Der Clip direkt um die Loesch-Aktion — nicht irgendein ClipRect
+    // weiter oben im Baum (Scaffold & Co. haben eigene).
+    Finder clip() => find
+        .ancestor(of: find.text('Löschen'), matching: find.byType(ClipRect))
+        .first;
+
     await geste.moveBy(const Offset(-50, 0));
     await tester.pump();
-    final teilweise = tester.getSize(find.byType(ClipRect).first).width;
+    final teilweise = tester.getSize(clip()).width;
     expect(teilweise, greaterThan(0));
 
     await geste.moveBy(const Offset(-300, 0));
     await geste.up();
     await tester.pumpAndSettle();
-    final voll = tester.getSize(find.byType(ClipRect).first).width;
+    final voll = tester.getSize(clip()).width;
 
     expect(
       teilweise,
