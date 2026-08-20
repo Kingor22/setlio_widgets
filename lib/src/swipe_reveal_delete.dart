@@ -188,20 +188,32 @@ class _SwipeRevealDeleteState extends State<SwipeRevealDelete>
             children: [
               // Die Aktionsfelder liegen hinter der Zeile und werden
               // durch das Verschieben freigelegt.
+              // SET-76 (Nutzer-Befund 21.08.): Die Flaeche war sofort in
+              // VOLLER Breite da und wurde nur von der Zeile verdeckt —
+              // bei jedem Pixel Versatz (und durch die abgerundeten
+              // Ecken) schimmerte der ganze rote Block hervor. Jetzt ist
+              // sie exakt so breit wie das, was die Zeile freigelegt hat:
+              // Vor dem Wischen null, dann waechst sie mit.
               Positioned.fill(
                 child: Align(
                   alignment: Alignment.centerRight,
-                  child: _SwipeAction(
-                    width: _actionWidth,
-                    visible: value > 0,
+                  child: ClipRect(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      widthFactor: value.clamp(0.0, 1.0),
+                      child: _SwipeAction(
+                        width: _actionWidth,
+                        visible: value > 0,
                     label: widget.label,
                     icon: widget.icon,
                     borderRadius: widget.borderRadius,
                     color: const Color(DesignTokens.red),
-                    onTap: () {
-                      _close();
-                      widget.onDelete();
-                    },
+                        onTap: () {
+                          _close();
+                          widget.onDelete();
+                        },
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -209,17 +221,23 @@ class _SwipeRevealDeleteState extends State<SwipeRevealDelete>
                 Positioned.fill(
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: _SwipeAction(
-                      width: _actionWidth,
-                      visible: value < 0,
+                    child: ClipRect(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: (-value).clamp(0.0, 1.0),
+                        child: _SwipeAction(
+                          width: _actionWidth,
+                          visible: value < 0,
                       label: widget.leadingLabel ?? '',
                       icon: widget.leadingIcon ?? Icons.folder_outlined,
                       borderRadius: widget.borderRadius,
                       color: widget.leadingColor,
-                      onTap: () {
-                        _close();
-                        widget.onLeading!();
-                      },
+                          onTap: () {
+                            _close();
+                            widget.onLeading!();
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -27,6 +27,7 @@ class SharedTapTempoButton extends StatefulWidget {
     this.enabled = true,
     this.large = false,
     this.bare = false,
+    this.child,
   });
 
   final void Function(double bpm) onBpmCalculated;
@@ -41,6 +42,18 @@ class SharedTapTempoButton extends StatefulWidget {
   /// Padding). Für das Drehrad-Zentrum, wo das Rad selbst der sichtbare
   /// Rahmen ist; Tap-Verhalten unverändert.
   final bool bare;
+
+  /// Was IM Knopf steht, statt des schlichten „Tap".
+  ///
+  /// Gebraucht seit dem iPad-Umbau (15.08.): Dort sitzt die BPM-Zahl
+  /// mitten im Drehrad, und die ganze Fläche darum ist die Tap-Fläche.
+  /// Ohne diesen Weg müsste entweder die Zahl daneben stehen (dann ist
+  /// sie nicht mehr im Rad) oder die Tap-Fläche auf einen Streifen
+  /// darunter schrumpfen (dann trifft man sie im Dunkeln nicht).
+  ///
+  /// Null = unverändert das Wort „Tap". Bestehende Aufrufer merken von
+  /// dieser Erweiterung nichts.
+  final Widget? child;
 
   @override
   State<SharedTapTempoButton> createState() => _SharedTapTempoButtonState();
@@ -104,14 +117,15 @@ class _SharedTapTempoButtonState extends State<SharedTapTempoButton> {
         ? const EdgeInsets.symmetric(horizontal: 40, vertical: 28)
         : const EdgeInsets.symmetric(horizontal: 24, vertical: 16);
 
-    final label = Text(
-      'Tap',
-      style: TextStyle(
-        color: foreground,
-        fontSize: widget.large ? 22 : 16,
-        fontWeight: FontWeight.w300,
-      ),
-    );
+    final label = widget.child ??
+        Text(
+          'Tap',
+          style: TextStyle(
+            color: foreground,
+            fontSize: widget.large ? 22 : 16,
+            fontWeight: FontWeight.w300,
+          ),
+        );
 
     return GestureDetector(
       onTap: widget.enabled ? _onTap : null,

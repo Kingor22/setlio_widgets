@@ -131,7 +131,11 @@ class _BarOverridesDialogState extends State<_BarOverridesDialog> {
         '(Standard ${widget.defaultBeats}/${widget.defaultNote})',
       ),
       content: SizedBox(
-        width: 520,
+        // Der Takt-Editor ist seit SET-76 auch vom iPhone aus
+        // erreichbar. Feste 520 liefen dort über den Bildschirm.
+        width: MediaQuery.sizeOf(context).width < 600
+            ? MediaQuery.sizeOf(context).width - 80
+            : 520,
         child: SingleChildScrollView(
           child: Wrap(
             spacing: 8,

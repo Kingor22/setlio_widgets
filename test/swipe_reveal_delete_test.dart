@@ -54,6 +54,34 @@ void main() {
     expect(deleted, ['Song A']);
   });
 
+  testWidgets('das Löschfeld ist nur so breit wie freigelegt (SET-76)', (
+    tester,
+  ) async {
+    // Nutzer-Befund 21.08.: Der rote Block stand sofort in voller Breite
+    // hinter der Zeile und schimmerte bei jedem Pixel Versatz und an den
+    // runden Ecken durch. Jetzt waechst die Flaeche mit dem Finger.
+    await tester.pumpWidget(host(['Song A'], (_) {}));
+
+    final geste = await tester.startGesture(
+      tester.getCenter(find.text('Song A')),
+    );
+    await geste.moveBy(const Offset(-50, 0));
+    await tester.pump();
+    final teilweise = tester.getSize(find.byType(ClipRect).first).width;
+    expect(teilweise, greaterThan(0));
+
+    await geste.moveBy(const Offset(-300, 0));
+    await geste.up();
+    await tester.pumpAndSettle();
+    final voll = tester.getSize(find.byType(ClipRect).first).width;
+
+    expect(
+      teilweise,
+      lessThan(voll * 0.7),
+      reason: 'halb gewischt darf nicht die ganze Flaeche zeigen',
+    );
+  });
+
   testWidgets('kurzer Wisch schnappt zurück', (tester) async {
     final deleted = <String>[];
     await tester.pumpWidget(host(['Song A'], deleted.add));
